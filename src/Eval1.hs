@@ -54,8 +54,8 @@ stepComm (IfThenElse p c0 c1) s | b         = c0 :!: s
                                 | otherwise = c1 :!: s
                                 where b = evalExp p s
 
-stepComm r@(While b c) s       = let ite = IfThenElse b Skip r
-                                  in (Seq c ite :!: s)        -- esta mal para el primer caso              
+stepComm r@(While b c) s       = let ite = IfThenElse b (Seq c r) Skip
+                                 in (ite :!: s)             
 
 -- Evalua una expresion
 -- Completar la definición
@@ -83,11 +83,12 @@ evalExp (Times e0 e1) s = let n0 = evalExp e0 s
 evalExp (Div e0 e1) s   = let n0 = evalExp e0 s
                               n1 = evalExp e1 s
                           in (div n0 n1)
-{-
-evalExp (ECond p0 e0 e1) s | p1        = evalExp e0 s
-                           | otherwise = evalExp e1 s
-                           where p1 = evalExp p0 s 
--}
+
+evalExp (ECond p0 e0 e1) s = let p1 = evalExp p0 s
+                                 n = if p1 then evalExp e0 s 
+                                            else evalExp e1 s
+                             in n
+
 evalExp BTrue s       = True
 
 evalExp BFalse s      = False

@@ -62,8 +62,8 @@ stepComm (IfThenElse p c0 c1) s = case evalExp p s of
                                                      else Right (c1 :!: s)
                                     Left err -> Left err
 
-stepComm r@(While b c) s       = let ite = IfThenElse b Skip r
-                                  in Right (Seq c ite :!: s) -- esta mal para el primer caso
+stepComm r@(While b c) s       = let ite = IfThenElse b (Seq c r) Skip
+                                 in Right (ite :!: s)
 
 -- Evalua una expresion
 -- Completar la definición
@@ -109,14 +109,13 @@ evalExp (Div e0 e1) s   = case evalExp e0 s of
                                             else Right (div n0 n1)
                                     Left err -> Left err
                             Left err -> Left err
-{-
-evalExp (ECond p0 e0 e1) s = case evalExp p0 of
-                              Right p1 ->
-                                if p1
-                                  then Right (evalExp e0 s)
-                                  else Right (evalEXP e1 s)
-                              Left err -> Left err
--}
+
+evalExp (ECond p0 e0 e1) s = case evalExp p0 s of
+                                Right p1 -> 
+                                  if p1
+                                    then evalExp e0 s
+                                    else evalExp e1 s
+                                Left err -> Left err
 
 evalExp BTrue s       = Right True
 

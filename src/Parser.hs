@@ -37,6 +37,8 @@ lis = makeTokenParser
                         , "!="
                         , ";"
                         , ","
+                        ,"?"
+                        ,":"
                         ]
     }
   )
@@ -45,10 +47,12 @@ lis = makeTokenParser
 --- Parser de expressiones enteras
 -----------------------------------
 intexp :: Parser (Exp Int)
-intexp = expr 
-{-chainl1 expr ternop
-          where ternop = do { reservedOp lis "?"; return (ECond)}
--}
+intexp = try (do b <- boolatom
+                 reservedOp lis "?"
+                 i1 <- intexp
+                 reservedOp lis ":"
+                 ECond b i1 <$> intexp)
+         <|> expr
 
 expr :: Parser (Exp Int)
 expr = chainl1 term plusMin
@@ -84,19 +88,8 @@ bool1 :: Parser (Exp Bool)
 bool1 = chainl1 bool2 andop
           where andop = do { reservedOp lis "&&"; return (And)}
 
-
 bool2 :: Parser (Exp Bool)
-bool2 = do reservedOp lis "!"
-           Not <$> bool3
-          <|> do bool3
-
-bool3 :: Parser (Exp Bool)
-bool3 = do reserved lis "true"
-           return BTrue
-          <|> do reserved lis "false"
-                 return BFalse
-          <|> do parens lis boolexp
-          <|> do i <- intexp
+bool2 = try ( do i <- intexp
                  do reservedOp lis "=="
                     Eq i <$> intexp
                    <|> do reservedOp lis "!="
@@ -104,8 +97,16 @@ bool3 = do reserved lis "true"
                    <|> do reservedOp lis "<"
                           Lt i <$> intexp
                    <|> do reservedOp lis ">"
-                          Gt i <$> intexp
-
+                          Gt i <$> intexp)
+        <|> boolatom
+boolatom :: Parser (Exp Bool)
+boolatom = do reserved lis "true"
+              return BTrue
+              <|> do reserved lis "false"
+                     return BFalse
+              <|> do reservedOp lis "!"
+                     Not <$> boolatom
+              <|> parens lis boolexp
 -----------------------------------
 --- Parser de comandos
 -----------------------------------
@@ -136,7 +137,6 @@ comm2 = do reserved lis "if"
           <|> do v <- identifier lis
                  reservedOp lis "="
                  Let v <$> intexp
--- caso if solo?
 
 ------------------------------------
 -- Función de parseo

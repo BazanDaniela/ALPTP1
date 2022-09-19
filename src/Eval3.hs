@@ -16,15 +16,12 @@ type State = (M.Map Variable Int, Integer)
 initState :: State
 initState = (M.empty, 0)
 
-f :: (a, b) -> a
-f = Prelude.fst
-
 -- Busca el valor de una variable en un estado
 -- Completar la definición
 lookfor :: Variable -> State -> Either Error Int
-lookfor v s = case M.lookup v $ f s of
-                Just n -> Right n
-                _      -> Left UndefVar
+lookfor v (s, i) = case M.lookup v s of
+                    Just n -> Right n
+                    _      -> Left UndefVar
 
 -- Cambia el valor de una variable en un estado
 -- Completar la definición
@@ -55,8 +52,8 @@ stepComm :: Comm -> State -> Either Error (Pair Comm State)
 stepComm Skip s                 = Right (Skip :!: s)
 
 stepComm (Let v e) s            = case evalExp e s of
-                                    Right (n :!: s') -> let s'  = update v n s'
-                                                        in Right (Skip :!: s')
+                                    Right (n :!: s') -> let s''  = update v n s'
+                                                        in Right (Skip :!: s'')
                                     Left err         -> Left err
 
 stepComm (Seq Skip c1) s        = Right (c1 :!: s)
@@ -70,8 +67,8 @@ stepComm (IfThenElse p c0 c1) s = case evalExp p s of
                                                              else Right (c1 :!: s')
                                     Left err         -> Left err
 
-stepComm r@(While b c) s       = let ite = IfThenElse b Skip r
-                                  in Right (Seq c ite :!: s) -- falla para el primer caso
+stepComm r@(While b c) s       = let ite = IfThenElse b (Seq c r) Skip
+                                 in Right (ite :!: s)
 
 -- Evalua una expresion
 -- Completar la definición
@@ -117,14 +114,13 @@ evalExp (Div e0 e1) s   = case evalExp e0 s of
                                             else Right (div n0 n1 :!: (addWork 3 s1))
                                     Left err -> Left err
                             Left err -> Left err
-{-
-evalExp (ECond p0 e0 e1) s = case evalExp p0 of
-                              Right p1 ->
-                                if p1
-                                  then Right (evalExp e0 s)
-                                  else Right (evalEXP e1 s)
-                              Left err -> Left err
--}
+
+evalExp (ECond p0 e0 e1) s = case evalExp p0 s of
+                                Right (p1 :!: s1) -> 
+                                  if p1
+                                    then evalExp e0 s1
+                                    else evalExp e1 s1
+                                Left err -> Left err
 
 evalExp BTrue s       = Right (True :!: s)
 
@@ -141,21 +137,21 @@ evalExp (Gt e0 e1) s  = case evalExp e0 s of
                             Right (n0 :!: s0) ->
                                 case evalExp e1 s0 of
                                     Right (n1 :!: s1) -> Right (n0 > n1 :!: (addWork 2 s1))
-                                    Left err           -> Left err
+                                    Left err          -> Left err
                             Left err -> Left err
 
 evalExp (And p0 p1) s = case evalExp p0 s of
                             Right (b0 :!: s0) ->
                                 case evalExp p1 s0 of
                                     Right (b1 :!: s1) -> Right (b0 && b1 :!: (addWork 2 s1))
-                                    Left err           -> Left err
+                                    Left err          -> Left err
                             Left err -> Left err
 
 evalExp (Or p0 p1) s  = case evalExp p0 s of
                             Right (b0 :!: s0) ->
                                 case evalExp p1 s0 of
                                     Right (b1 :!: s1) -> Right ((b0 || b1) :!: (addWork 2 s1))
-                                    Left err           -> Left err
+                                    Left err          -> Left err
                             Left err -> Left err
 
 evalExp (Not p) s     = case evalExp p s of
@@ -166,12 +162,12 @@ evalExp (Eq e0 e1) s  = case evalExp e0 s of
                             Right (n0 :!: s0) ->
                                 case evalExp e1 s0 of
                                     Right (n1 :!: s1) -> Right (n0 == n1 :!: (addWork 2 s1))
-                                    Left err           -> Left err
+                                    Left err          -> Left err
                             Left err -> Left err
 
 evalExp (NEq e0 e1) s = case evalExp e0 s of
                             Right (n0 :!: s0) ->
                                 case evalExp e1 s0 of
                                     Right (n1 :!: s1) -> Right (n0 /= n1 :!: (addWork 2 s1))
-                                    Left err           -> Left err
+                                    Left err          -> Left err
                             Left err -> Left err
