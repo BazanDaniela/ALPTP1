@@ -45,21 +45,98 @@ lis = makeTokenParser
 --- Parser de expressiones enteras
 -----------------------------------
 intexp :: Parser (Exp Int)
-intexp = undefined
+intexp = expr 
+{-chainl1 expr ternop
+          where ternop = do { reservedOp lis "?"; return (ECond)}
+-}
+
+expr :: Parser (Exp Int)
+expr = chainl1 term plusMin
+        where plusMin = try (do {reservedOp lis "+";
+                                 return Plus}) 
+                           <|> do reservedOp lis "-"
+                                  return Minus
+
+term :: Parser (Exp Int)
+term = chainl1 factor mulDiv
+        where mulDiv = try (do {reservedOp lis "*";
+                                 return Times}) 
+                          <|> do reservedOp lis "/"
+                                 return Div
+
+factor :: Parser (Exp Int)
+factor = do reservedOp lis "-"
+            UMinus <$> factor
+           <|> do Const . fromIntegral <$> natural lis
+           <|> do parens lis intexp
+           <|> do Var <$> identifier lis
 
 -----------------------------------
 --- Parser de expressiones booleanas
 ------------------------------------
 
 boolexp :: Parser (Exp Bool)
-boolexp = undefined
+boolexp = chainl1 bool1 orop
+            where orop = do { reservedOp lis "||"; return (Or)}
+
+
+bool1 :: Parser (Exp Bool)
+bool1 = chainl1 bool2 andop
+          where andop = do { reservedOp lis "&&"; return (And)}
+
+
+bool2 :: Parser (Exp Bool)
+bool2 = do reservedOp lis "!"
+           Not <$> bool3
+          <|> do bool3
+
+bool3 :: Parser (Exp Bool)
+bool3 = do reserved lis "true"
+           return BTrue
+          <|> do reserved lis "false"
+                 return BFalse
+          <|> do parens lis boolexp
+          <|> do i <- intexp
+                 do reservedOp lis "=="
+                    Eq i <$> intexp
+                   <|> do reservedOp lis "!="
+                          NEq i <$> intexp
+                   <|> do reservedOp lis "<"
+                          Lt i <$> intexp
+                   <|> do reservedOp lis ">"
+                          Gt i <$> intexp
 
 -----------------------------------
 --- Parser de comandos
 -----------------------------------
 
 comm :: Parser Comm
-comm = undefined
+comm = chainl1 comm2 sequence
+        where sequence = do {reservedOp lis ";"; return (Seq)}
+
+comm2 :: Parser Comm
+comm2 = do reserved lis "if"
+           b <- boolexp
+           reservedOp lis "{"
+           ct <- comm
+           reservedOp lis "}"
+           reserved lis "else"
+           reservedOp lis "{"
+           cf <- comm
+           reservedOp lis "}"
+           return (IfThenElse b ct cf)
+          <|> do reserved lis "while"
+                 b <- boolexp
+                 reservedOp lis "{"
+                 c <- comm
+                 reservedOp lis "}"
+                 return (While b c)
+          <|> do reserved lis "skip"
+                 return Skip
+          <|> do v <- identifier lis
+                 reservedOp lis "="
+                 Let v <$> intexp
+-- caso if solo?
 
 ------------------------------------
 -- Función de parseo
